@@ -25,8 +25,9 @@ async function fetchPersonInfoByEmail(
   // ユーザーのメールアドレスから人物の情報を取得する
   let prompt = `
         この質問に対する回答はObsidianのノートに記載されます。チャットではないので、質問文は含めないでください。
-        特に職歴・嗜好性・趣味・職業における考え方などを詳細にまとめてください。
+        特に基本プロフィール・職歴・経歴や実績・ネットワーク（業界内のつながり）などを詳細にまとめてください。
         アウトプットはマークダウン形式で出力してください。なお、headerは最大h2から出力してください。
+        出来うる限り、根拠となるURLをリンクとして出力してください。
         以下の情報を持つ人物について調べてください
         メールアドレス: ${email}
         `;
@@ -44,7 +45,7 @@ async function fetchPersonInfoByEmail(
       },
     ],
     search_parameters: {
-      mode: "auto",
+      mode: "on",
     },
     model: "grok-3-latest",
   };
@@ -68,7 +69,7 @@ async function fetchCompanyInfoByDomain(
   apiKey: string
 ): Promise<any> {
   const endpoint = "https://api.x.ai/v1/chat/completions";
-  let prompt = `\nこの質問に対する回答はObsidianのノートに記載されます。チャットではないので、質問文は含めないでください。\n企業の事業内容・沿革・強み・業界での立ち位置・主要なプロダクトやサービス・競合との違いなどを詳細にまとめてください。\nアウトプットはマークダウン形式で出力してください。なお、見出しテキストは最大h2まで出力してください。\n以下の情報を持つ企業について調べてください\n企業名: ${company}\ndomain: ${domain}\n`;
+  let prompt = `\nこの質問に対する回答はObsidianのノートに記載されます。チャットではないので、質問文は含めないでください。\n企業の事業内容・沿革・強み・業界での立ち位置・主要なプロダクトやサービス・競合との違いなどを詳細にまとめてください。\nアウトプットはマークダウン形式で出力してください。なお、見出しテキストは最大h2まで出力してください。出来うる限り、根拠となるURLをリンクとして出力してください。\n以下の情報を持つ企業について調べてください\n企業名: ${company}\ndomain: ${domain}\n`;
   const body = {
     messages: [
       {
@@ -77,7 +78,7 @@ async function fetchCompanyInfoByDomain(
       },
     ],
     search_parameters: {
-      mode: "auto",
+      mode: "on",
     },
     model: "grok-3-latest",
   };
