@@ -17,25 +17,27 @@ const DEFAULT_SETTINGS: ProcessPersonPluginSettings = {
 
 // --- xaiClient.ts の内容 ---
 async function fetchPersonInfoByEmail(
-  email: string,
   apiKey: string,
-  options?: { company?: string; name?: string }
+  options?: { company?: string; name?: string; email?: string; title?: string }
 ): Promise<any> {
   const endpoint = "https://api.x.ai/v1/chat/completions";
   // ユーザーのメールアドレスから人物の情報を取得する
-  let prompt = `
-        この質問に対する回答はObsidianのノートに記載されます。チャットではないので、質問文は含めないでください。
+  let prompt = `この質問に対する回答はObsidianのノートに記載されます。チャットではないので、質問文は含めないでください。
         特に基本プロフィール・職歴・経歴や実績・ネットワーク（業界内のつながり）などを詳細にまとめてください。
         アウトプットはマークダウン形式で出力してください。なお、headerは最大h2から出力してください。
         出来うる限り、根拠となるURLをリンクとして出力してください。
-        以下の情報を持つ人物について調べてください
-        メールアドレス: ${email}
-        `;
+        以下の情報を持つ人物について調べてください`;
+  if (options?.email) {
+    prompt += `\nメールアドレス: ${options.email}`;
+  }
   if (options?.name) {
     prompt += `\n名前: ${options.name}`;
   }
   if (options?.company) {
     prompt += `\n会社: ${options.company}`;
+  }
+  if (options?.title) {
+    prompt += `\n職位: ${options.title}`;
   }
   const body = {
     messages: [
@@ -125,22 +127,28 @@ export default class ProcessPersonPlugin extends Plugin {
         // frontmatter取得
         const cache = this.app.metadataCache.getFileCache(file);
         const frontmatter = cache?.frontmatter;
-        if (!frontmatter) {
-          new Notice("プロパティ（frontmatter）が見つかりません");
-          return;
-        }
-        const email = frontmatter.email;
-        const domain = frontmatter.domain;
-        // ファイル名から拡張子を除いたものを名前または企業名とする
+        const tags = (frontmatter?.tags || frontmatter?.tag || "")
+          .toString()
+          .split(/[,\s]+/)
+          .filter(Boolean);
+        // タグで判定
+        const isPerson = tags.includes("person");
+        const isCompany = tags.includes("company");
+        const email = frontmatter?.email;
+        const domain = frontmatter?.domain;
+        const title = frontmatter?.title;
         const nameOrCompany = file.basename;
-        if (email) {
-          new Notice(`email: ${email}`);
-          let loadingNotice = new Notice("xAIで情報取得中...");
+        if (isPerson) {
+          let loadingNotice = new Notice("xAIで人物情報取得中...");
           try {
             const result = await fetchPersonInfoByEmail(
-              email,
               this.settings.xaiApiKey,
-              { company: frontmatter.company, name: nameOrCompany }
+              {
+                company: frontmatter?.company,
+                name: nameOrCompany,
+                title: title,
+                email: email,
+              }
             );
             loadingNotice.hide();
             const content =
@@ -149,13 +157,16 @@ export default class ProcessPersonPlugin extends Plugin {
               file,
               `\n---\n# 人物情報 (xAIより):\n${content}\n`
             );
-            new Notice("xAIの情報をノートに追記しました");
+            new Notice("xAIの人物情報をノートに追記しました");
           } catch (err: any) {
             loadingNotice.hide();
             new Notice(`xAI APIエラー: ${err.message}`);
           }
-        } else if (domain) {
-          new Notice(`domain: ${domain}`);
+        } else if (isCompany) {
+          if (!domain) {
+            new Notice("企業情報取得にはdomainが必要です");
+            return;
+          }
           let loadingNotice = new Notice("xAIで企業情報取得中...");
           try {
             const result = await fetchCompanyInfoByDomain(
@@ -176,7 +187,7 @@ export default class ProcessPersonPlugin extends Plugin {
             new Notice(`xAI APIエラー: ${err.message}`);
           }
         } else {
-          new Notice("emailプロパティが見つかりません");
+          new Notice("#person または #company タグを付与してください");
         }
       }
     );
