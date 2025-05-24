@@ -1,0 +1,14 @@
+{
+  "name": "process-person",
+  "version": "0.0.1",
+  "description": "A plugin to process person-related data in Obsidian.",
+  "main": "main.js",
+  "scripts": {
+    "build": "tsc && cp main.js dist/main.js && cp manifest.json dist/manifest.json"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "obsidian": "^1.5.8",
+    "typescript": "^5.0.0"
+  }
+}

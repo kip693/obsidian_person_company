@@ -1,0 +1,10 @@
+{
+  "id": "process-person",
+  "name": "Summarize Person/Company",
+  "version": "0.0.1",
+  "minAppVersion": "0.15.0",
+  "description": "A plugin to process person/company data in Obsidian using AI.",
+  "author": "Kippei Wada",
+  "authorUrl": "",
+  "main": "main.js"
+}
