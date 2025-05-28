@@ -132,8 +132,8 @@ export default class ProcessPersonPlugin extends Plugin {
           .split(/[,\s]+/)
           .filter(Boolean);
         // タグで判定
-        const isPerson = tags.includes("person");
-        const isCompany = tags.includes("company");
+        const isPerson = tags.includes("person") || tags.includes("#person");
+        const isCompany = tags.includes("company") || tags.includes("#company");
         const email = frontmatter?.email;
         const domain = frontmatter?.domain;
         const title = frontmatter?.title;

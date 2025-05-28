@@ -1,64 +1,73 @@
 # Process Person Plugin
 
-Obsidian 用のプラグインです。個人 CRM を Obsidian で実施している方におすすめです。xAI の API を利用して、メールアドレスや企業のドメインから人物・企業についての情報を web から収集・サマリした情報を Obsidian に追記します。
+This is an Obsidian plugin designed for personal CRM and knowledge management. It leverages the xAI API to fetch and summarize information about people or companies based on email addresses or company domains, and appends the results to your Obsidian notes.
 
-## 機能概要
+## Features
 
-- ノートの YAML frontmatter に `email` があれば、その人物について xAI API で情報を取得し、ノート末尾にマークダウン形式で追記します。
-- `domain` があれば、ノート名（ファイル名）を企業名として xAI API で企業情報を取得し、ノート末尾にマークダウン形式で追記します。
-- どちらもなければ通知で知らせます。
-- 取得中はローディング通知を表示します。
-- すべて Obsidian のツールリボン（AI アイコン）からワンクリックで実行できます。
+- If the YAML frontmatter of a note contains `#person` in the tags, the plugin will treat the note as a person and fetch information from xAI using the note title (as the name), and optionally `email`, `company`, and `title` if present.
+- If the YAML frontmatter contains `#company` in the tags, the plugin will treat the note as a company and fetch information from xAI using the note title (as the company name) and `domain`.
+- If neither tag is present, the plugin will prompt you to add one.
+- All information is appended to the end of the note in Markdown format, with a clear section header.
+- While fetching, a loading notification is shown.
+- All actions are triggered from a single AI-themed ribbon button in the Obsidian UI.
 
-## API キーの設定
+## API Key Setup
 
-1. プラグインを有効化後、Obsidian の「設定」→「プラグイン」→「Process Person Plugin」→「xAI API キー」欄に API キーを入力してください。
-2. API キーが未設定の場合、ボタン押下時に警告が表示されます。
+1. After enabling the plugin, go to Obsidian **Settings → Community plugins → Process Person Plugin**.
+2. Enter your xAI API key in the "xAI API Key" field.
+3. If the API key is not set, the plugin will prompt you to enter it when you try to use the button.
 
-## ノートの YAML 例
+## YAML Frontmatter Examples
 
-### 人物情報
+### For a Person
 
 ```markdown
 ---
+tags: [person]
 email: example@example.com
 company: Example Inc.
+title: CTO
 ---
 ```
 
-### 企業情報
+### For a Company
 
 ```markdown
 ---
+tags: [company]
 domain: example.com
 ---
 ```
 
-## 追記される内容
+## Output Format
 
-- 取得した情報はノート末尾に `---` 区切りでマークダウン形式で追記されます。
-- 人物情報は `# 人物情報 (xAIより):`、企業情報は `# 企業情報 (xAIより):` の見出しで始まります。
-- xAI へのプロンプトには、人物の場合はメールアドレス・ノート名（名前）・company（あれば）、企業の場合はノート名（企業名）・domain が渡されます。
-- アウトプットはマークダウン形式で、header は最大 h2 から出力されます。
+- The fetched information is appended to the end of the note, separated by `---` and with a Markdown section header.
+- For people: `# Person Info (from xAI):`
+- For companies: `# Company Info (from xAI):`
+- The xAI prompt includes all available fields (name, email, company, title, domain) as context.
+- Output is always in Markdown, with headers starting from h2 or lower.
 
-## インストール方法
+## Installation
 
-1. このリポジトリをクローンまたはダウンロードします。
-2. 依存パッケージをインストールします:
+1. Clone or download this repository.
+2. Install dependencies:
    ```sh
    npm install
    ```
-3. プラグインをビルドします:
+3. Build the plugin:
    ```sh
    npm run build
    ```
-4. `dist`フォルダ内のファイル（`main.js`, `manifest.json` など）を Obsidian のプラグインフォルダにコピーします。
+4. Install to your Obsidian plugins folder with:
+   ```sh
+   make install
+   ```
 
-## 開発方法
+## Development
 
-- `src/main.ts` にプラグインのロジックを実装します。
-- TypeScript で開発し、`npm run build`でビルドしてください。
+- Edit your logic in `src/main.ts`.
+- Use TypeScript and run `npm run build` to compile.
 
 ---
 
-このプラグインは Obsidian API を利用しています。
+This plugin uses the Obsidian API and xAI API.
