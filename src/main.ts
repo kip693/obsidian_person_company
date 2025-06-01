@@ -35,7 +35,13 @@ const DEFAULT_SETTINGS: ProcessPersonPluginSettings = {
 async function fetchPersonInfoByEmail(
   apiKey: string,
   prompt: string,
-  options?: { company?: string; name?: string; email?: string; title?: string }
+  options?: {
+    company?: string;
+    name?: string;
+    email?: string;
+    title?: string;
+    contact?: string;
+  }
 ): Promise<any> {
   const endpoint = "https://api.x.ai/v1/chat/completions";
   let fullPrompt = prompt;
@@ -50,6 +56,9 @@ async function fetchPersonInfoByEmail(
   }
   if (options?.title) {
     fullPrompt += `\n職位: ${options.title}`;
+  }
+  if (options?.contact) {
+    fullPrompt += `\nSNS: ${options.contact}`;
   }
   const body = {
     messages: [
@@ -153,6 +162,72 @@ async function fetchProductInfoByName(
   return await res.json();
 }
 
+// ローディング用トースト（通知風UI）
+class LoadingToast {
+  toastEl: HTMLElement;
+  constructor(message: string) {
+    this.toastEl = document.createElement("div");
+    this.toastEl.className = "ai-loading-toast";
+    this.toastEl.innerHTML = `
+      <div class="ai-loading-toast-content">
+        <span class="ai-loading-spinner-inline"></span>
+        <span>${message}</span>
+      </div>
+    `;
+    document.body.appendChild(this.toastEl);
+  }
+  close() {
+    if (this.toastEl && this.toastEl.parentNode) {
+      this.toastEl.parentNode.removeChild(this.toastEl);
+    }
+  }
+}
+
+// スタイル追加（1回だけ）
+if (!document.getElementById("ai-loading-toast-style")) {
+  const style = document.createElement("style");
+  style.id = "ai-loading-toast-style";
+  style.textContent = `
+    .ai-loading-toast {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 9999;
+      background: #222;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-size: 1em;
+      display: flex;
+      align-items: center;
+      min-width: 200px;
+      pointer-events: none;
+      opacity: 0.95;
+    }
+    .ai-loading-toast-content {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ai-loading-spinner-inline {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #888;
+      border-top: 3px solid #fff;
+      border-radius: 50%;
+      animation: ai-spin 1s linear infinite;
+      margin-right: 4px;
+    }
+    @keyframes ai-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 export default class ProcessPersonPlugin extends Plugin {
   settings!: ProcessPersonPluginSettings;
   ribbonIconEl: HTMLElement | null = null;
@@ -166,114 +241,17 @@ export default class ProcessPersonPlugin extends Plugin {
       "bot",
       "Process with AI",
       async () => {
-        // APIキー未設定時のガード
-        if (!this.settings.xaiApiKey) {
-          new Notice(
-            "xAI APIキーが設定されていません。設定画面から入力してください。"
-          );
-          return;
-        }
-        // アクティブファイル取得
-        const file = this.app.workspace.getActiveFile();
-        if (!file) {
-          new Notice("アクティブなノートがありません");
-          return;
-        }
-        // frontmatter取得
-        const cache = this.app.metadataCache.getFileCache(file);
-        const frontmatter = cache?.frontmatter;
-        const tags = (frontmatter?.tags || frontmatter?.tag || "")
-          .toString()
-          .split(/[,\s]+/)
-          .filter(Boolean);
-        // タグで判定
-        const isPerson = tags.includes("person") || tags.includes("#person");
-        const isCompany = tags.includes("company") || tags.includes("#company");
-        const isProduct = tags.includes("product") || tags.includes("#product");
-        const email = frontmatter?.email;
-        const domain = frontmatter?.domain;
-        const title = frontmatter?.title;
-        const nameOrCompany = file.basename;
-        const company = frontmatter?.company;
-        if (isPerson) {
-          const loadingNotice = new Notice("xAIで人物情報取得中...");
-          try {
-            const result = await fetchPersonInfoByEmail(
-              this.settings.xaiApiKey,
-              this.settings.personPrompt,
-              {
-                company: frontmatter?.company,
-                name: nameOrCompany,
-                title: title,
-                email: email,
-              }
-            );
-            loadingNotice.hide();
-            const content =
-              result?.choices?.[0]?.message?.content || JSON.stringify(result);
-            await this.app.vault.append(
-              file,
-              `\n---\n# 人物情報 (xAIより):\n${content}\n`
-            );
-            new Notice("xAIの人物情報をノートに追記しました");
-          } catch (err: any) {
-            loadingNotice.hide();
-            new Notice(`xAI APIエラー: ${err.message}`);
-          }
-        } else if (isCompany) {
-          if (!domain) {
-            new Notice("企業情報取得にはdomainが必要です");
-            return;
-          }
-          const loadingNotice = new Notice("xAIで企業情報取得中...");
-          try {
-            const result = await fetchCompanyInfoByDomain(
-              nameOrCompany,
-              domain,
-              this.settings.xaiApiKey,
-              this.settings.companyPrompt
-            );
-            loadingNotice.hide();
-            const content =
-              result?.choices?.[0]?.message?.content || JSON.stringify(result);
-            await this.app.vault.append(
-              file,
-              `\n---\n# 企業情報 (xAIより):\n${content}\n`
-            );
-            new Notice("xAIの企業情報をノートに追記しました");
-          } catch (err: any) {
-            loadingNotice.hide();
-            new Notice(`xAI APIエラー: ${err.message}`);
-          }
-        } else if (isProduct) {
-          const loadingNotice = new Notice("xAIでプロダクト情報取得中...");
-          try {
-            const result = await fetchProductInfoByName(
-              this.settings.xaiApiKey,
-              this.settings.productPrompt,
-              {
-                name: nameOrCompany,
-                company: company,
-                domain: domain,
-              }
-            );
-            loadingNotice.hide();
-            const content =
-              result?.choices?.[0]?.message?.content || JSON.stringify(result);
-            await this.app.vault.append(
-              file,
-              `\n---\n# プロダクト情報 (xAIより):\n${content}\n`
-            );
-            new Notice("xAIのプロダクト情報をノートに追記しました");
-          } catch (err: any) {
-            loadingNotice.hide();
-            new Notice(`xAI APIエラー: ${err.message}`);
-          }
-        } else {
-          new Notice("#person または #company タグを付与してください");
-        }
+        await this.runProcessWithAI();
       }
     );
+    // コマンド登録（ホットキー割り当て用）
+    this.addCommand({
+      id: "process-with-ai",
+      name: "Process with AI (アクティブノートでAI情報を追記)",
+      callback: async () => {
+        await this.runProcessWithAI();
+      },
+    });
   }
 
   onunload() {
@@ -288,6 +266,132 @@ export default class ProcessPersonPlugin extends Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  async runProcessWithAI() {
+    // APIキー未設定時のガード
+    if (!this.settings.xaiApiKey) {
+      new Notice(
+        "xAI APIキーが設定されていません。設定画面から入力してください。"
+      );
+      return;
+    }
+    // アクティブファイル取得
+    const file = this.app.workspace.getActiveFile();
+    if (!file) {
+      new Notice("アクティブなノートがありません");
+      return;
+    }
+    // frontmatter取得
+    const cache = this.app.metadataCache.getFileCache(file);
+    const frontmatter = cache?.frontmatter;
+    let tags: string[] = [];
+    if (Array.isArray(frontmatter?.tags)) {
+      tags = frontmatter.tags.map((t: any) => t.toString());
+    } else if (frontmatter?.tags) {
+      tags = frontmatter.tags
+        .toString()
+        .split(/[\s,]+/)
+        .filter(Boolean);
+    } else if (frontmatter?.tag) {
+      tags = frontmatter.tag
+        .toString()
+        .split(/[\s,]+/)
+        .filter(Boolean);
+    }
+    // タグで判定
+    const isPerson = tags.includes("person") || tags.includes("#person");
+    const isCompany = tags.includes("company") || tags.includes("#company");
+    const isProduct = tags.includes("product") || tags.includes("#product");
+    const email = frontmatter?.email;
+    const domain = frontmatter?.domain;
+    const title = frontmatter?.title;
+    const nameOrCompany = file.basename;
+    const company = frontmatter?.company;
+
+    console.log(isPerson, isCompany, isProduct);
+    console.log(tags);
+    console.log(frontmatter);
+    if (isPerson) {
+      const loadingToast = new LoadingToast("xAIで人物情報取得中...");
+      try {
+        const result = await fetchPersonInfoByEmail(
+          this.settings.xaiApiKey,
+          this.settings.personPrompt,
+          {
+            company: frontmatter?.company,
+            name: nameOrCompany,
+            title: title,
+            email: email,
+            contact: frontmatter?.contact,
+          }
+        );
+        loadingToast.close();
+        const content =
+          result?.choices?.[0]?.message?.content || JSON.stringify(result);
+        await this.app.vault.append(
+          file,
+          `\n---\n# 人物情報 (xAIより):\n${content}\n`
+        );
+        new Notice(`「${file.basename}」の人物情報をノートに追記しました`);
+      } catch (err: any) {
+        loadingToast.close();
+        new Notice(`xAI APIエラー: ${err.message}`);
+      }
+    } else if (isCompany) {
+      if (!domain) {
+        new Notice("企業情報取得にはdomainが必要です");
+        return;
+      }
+      const loadingToast = new LoadingToast("xAIで企業情報取得中...");
+      try {
+        const result = await fetchCompanyInfoByDomain(
+          nameOrCompany,
+          domain,
+          this.settings.xaiApiKey,
+          this.settings.companyPrompt
+        );
+        loadingToast.close();
+        const content =
+          result?.choices?.[0]?.message?.content || JSON.stringify(result);
+        await this.app.vault.append(
+          file,
+          `\n---\n# 企業情報 (xAIより):\n${content}\n`
+        );
+        new Notice(`「${file.basename}」の企業情報をノートに追記しました`);
+      } catch (err: any) {
+        loadingToast.close();
+        new Notice(`xAI APIエラー: ${err.message}`);
+      }
+    } else if (isProduct) {
+      const loadingToast = new LoadingToast("xAIでプロダクト情報取得中...");
+      try {
+        const result = await fetchProductInfoByName(
+          this.settings.xaiApiKey,
+          this.settings.productPrompt,
+          {
+            name: nameOrCompany,
+            company: company,
+            domain: domain,
+          }
+        );
+        loadingToast.close();
+        const content =
+          result?.choices?.[0]?.message?.content || JSON.stringify(result);
+        await this.app.vault.append(
+          file,
+          `\n---\n# プロダクト情報 (xAIより):\n${content}\n`
+        );
+        new Notice(
+          `「${file.basename}」のプロダクト情報をノートに追記しました`
+        );
+      } catch (err: any) {
+        loadingToast.close();
+        new Notice(`xAI APIエラー: ${err.message}`);
+      }
+    } else {
+      new Notice("#person または #company タグを付与してください");
+    }
   }
 }
 
