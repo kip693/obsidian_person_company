@@ -6,5 +6,6 @@
   "description": "A plugin to process person/company data in Obsidian using AI.",
   "author": "Kippei Wada",
   "authorUrl": "",
-  "main": "main.js"
+  "main": "main.js",
+  "mobile": true
 }
